@@ -1,0 +1,36 @@
+# ===== Gradle =====
+.gradle/
+build/
+**/build/
+
+# ===== IntelliJ / JetBrains =====
+.idea/
+*.iml
+*.iws
+*.ipr
+out/
+
+# ===== VS Code =====
+.vscode/
+
+# ===== macOS =====
+.DS_Store
+
+# ===== Logs =====
+*.log
+
+# ===== OS / Temp =====
+*.swp
+*~
+*.tmp
+
+# ===== Environment / Secrets =====
+.env
+.env.local
+.env.*.local
+
+# ===== Java / Kotlin =====
+*.class
+
+# ===== Misc =====
+hs_err_pid*
