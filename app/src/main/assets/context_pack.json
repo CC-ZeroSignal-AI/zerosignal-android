@@ -1,0 +1,35 @@
+{
+  "metadata": {
+    "packId": "first-responder",
+    "language": "en",
+    "domain": "emergency_care",
+    "embeddingDimensions": 8,
+    "version": 1
+  },
+  "chunks": [
+    {
+      "id": "chunk_airway",
+      "text": "Check airway patency, look for obstructions, and apply jaw thrust if spinal injury is suspected.",
+      "embedding": [0.12, 0.18, 0.05, 0.40, 0.05, 0.24, 0.08, 0.10],
+      "metadata": {
+        "topic": "airway"
+      }
+    },
+    {
+      "id": "chunk_bleeding",
+      "text": "Control external bleeding with direct pressure and pressure dressings before moving the patient.",
+      "embedding": [0.06, 0.22, 0.14, 0.26, 0.11, 0.18, 0.16, 0.10],
+      "metadata": {
+        "topic": "bleeding"
+      }
+    },
+    {
+      "id": "chunk_triage",
+      "text": "During mass casualty incidents use START triage: assess respiration, perfusion, and mental status.",
+      "embedding": [0.20, 0.08, 0.10, 0.14, 0.28, 0.12, 0.04, 0.22],
+      "metadata": {
+        "topic": "triage"
+      }
+    }
+  ]
+}
