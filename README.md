@@ -1,55 +1,136 @@
-# CognitEdge Android MVP
+# ZeroSignal AI - Offline Android AI Assistant
 
-Offline Retrieval-Augmented Generation (RAG) prototype prepared for the Nexa SDK bounty hackathon. The project focuses on the data and native layer so UI is intentionally minimal. Model notes mirror the [Nexa SDK Android overview](https://docs.nexa.ai/en/nexa-sdk-android/overview).
+Offline Retrieval-Augmented Generation (RAG) assistant for Android, built for the Nexa SDK bounty hackathon. Downloads the Llama 3.2 3B NPU-Turbo model on first boot, stores embeddings in ObjectBox with HNSW indexing, and runs inference on Qualcomm Snapdragon NPU. Fully functional on emulator via a fake inference engine.
 
-## What works today
-- Loads an embedded Context Pack (`context_pack.json`) that mimics the `.cpack` download flow.
-- Performs vector search locally via `ContextRetriever` using cosine similarity.
-- Builds prompts that separate retrieved snippets from the final question.
-- Streams responses from a `FakeNexaInferenceEngine` so the pipeline runs on any device/emulator.
+## Architecture
 
-## Nexa models and SDK integration
-`rag/NexaModels.kt` lists the Snapdragon-ready binaries surfaced in the Nexa SDK overview (OmniNeural 4B Q8, Granite 4.0 Micro 3B INT4, Llama 3.2 3B Q4, and the Jina v2 reranker). Each entry captures quantization, context window, and bundle names so you can download the matching `*.bin` artifacts when you get SDK access.
+4-module structure with Hilt dependency injection:
 
-1. Implement `NexaRuntime` (see `rag/NexaRuntime.kt`) in C++/JNI per the Nexa docs so it can `loadModel(config)` and `streamCompletion(prompt)`.
-2. Wrap that runtime with `NexaBridgeEngine` and hand it to `RagViewModelFactory`. Thanks to the factory signature you can select the desired model config per device tier.
-3. Swap out `FakeNexaInferenceEngine` only when the JNI bridge is ready—the fake keeps everything testable today.
-4. Optional: run `jina-v2-rerank-npu` by letting `ContextRetriever` take the top-N cosine hits, reranking them using the Nexa runtime before prompt assembly.
-5. When you flip the system to on-device embedding generation, replace `QueryVectorizer` with a Nexa embedder or continue consuming downloaded context vectors as the bounty brief describes.
-
-## Project layout
 ```
-app/src/main/java/com/zerosignal/cognitedge
-├── MainActivity.kt                # minimal shell to interact with the pipeline
-└── rag
-    ├── ContextModels.kt           # ContextPack data classes
-    ├── ContextPackLoader.kt       # loads pack from assets/local storage
-    ├── ContextRetriever.kt        # cosine similarity search
-    ├── NexaInference.kt           # Nexa bridge abstraction + streaming fake engine
-    ├── NexaModels.kt              # Catalog of Snapdragon-ready Nexa models
-    ├── NexaRuntime.kt             # Contract for the JNI runtime
-    ├── NexaBridgeEngine.kt        # Loads models via NexaRuntime
-    ├── PromptBuilder.kt           # builds final prompt string
-    ├── QueryVectorizer.kt         # placeholder query encoder
-    └── RagController.kt/.kt       # orchestrates retrieval + generation
+:app                  Compose UI, navigation, ViewModels
+:core:domain          Shared contracts (models, repository interfaces, use cases)
+:core:ai              Inference engines, model catalog, Nexa SDK integration
+:core:data            Context loading, vector search, ObjectBox, prompt building
 ```
 
-## Running it
-1. Open the folder in Android Studio (Giraffe+).
-2. Sync Gradle (Gradle 8.7 / Android Gradle Plugin 8.5.2).
-3. Launch the default `app` configuration – MainActivity lets you type a question and shows the streaming answer.
+### Key components
 
-## Replacing the fake engine
-```kotlin
-val runtime = YourNexaRuntime(applicationContext)
-val factory = RagViewModelFactory(
-    appContext = applicationContext,
-    modelConfig = NexaModelCatalog.byId("omninneural-4b-q8") ?: NexaModelCatalog.defaultLlm()
-) { config ->
-    NexaBridgeEngine(runtime, config)
-}
+| Layer | Component | Description |
+|-------|-----------|-------------|
+| **Domain** | `AskQuestionUseCase` | Orchestrates retrieval + inference, returns streaming `AskResult` with source attribution |
+| **Domain** | `InferenceRepository` / `ContextRepository` | Clean interfaces for swapping implementations |
+| **AI** | `FakeNexaInferenceEngine` | Streams fake responses for emulator/testing |
+| **AI** | `NexaSdkEngine` | Real Nexa SDK wrapper (stub until SDK artifact available) |
+| **AI** | `NexaModelRepository` | Manages model download lifecycle with `ModelDownloadState` |
+| **Data** | `ObjectBoxContextRepository` | HNSW-indexed vector search via ObjectBox (768-dim, cosine) |
+| **Data** | `PromptBuilder` | Llama 3.2 chat template (`<\|begin_of_text\|>` format) |
+| **App** | `SetupScreen` | First-boot model download with progress UI |
+| **App** | `ChatScreen` | Chat interface with message bubbles, auto-scroll, source attribution |
+
+### NPU fallback strategy
+
 ```
-Return `factory` from `MainActivity`'s `viewModels` delegate (or a `Service`). Nothing else in the pipeline changes.
+Snapdragon device    -> plugin_id = "npu"     (real NPU inference)
+Non-Snapdragon       -> plugin_id = "cpu_gpu"  (CPU/GPU fallback)
+Emulator             -> FakeNexaInferenceEngine (skip download, demo mode)
+```
+
+## Context Pack
+
+The app ships with a **Yosemite National Park visitor guide** (`app/src/main/assets/context_pack.json`):
+- 13 chunks covering trails, safety, wildlife, campgrounds, emergencies, and more
+- 768-dimensional embeddings pre-computed with the same `QueryVectorizer` hash used at query time
+- Topics: Park Overview, El Capitan, Half Dome, Yosemite Falls, Bear Safety, Campgrounds, Weather/Seasons, Wilderness Permits, Emergency Procedures, Firefall, Giant Sequoias, Rock Fall Hazards, Transportation
+
+### Sample test questions
+
+- "How do I hike Half Dome?"
+- "What are the bear safety rules?"
+- "When do Yosemite Falls have the most water?"
+- "How do I get a wilderness permit?"
+- "What should I do in an emergency in the park?"
+- "Tell me about the giant sequoia trees"
+
+## Tech Stack
+
+- **Language**: Kotlin 1.9.24
+- **UI**: Jetpack Compose + Material3 (dark theme)
+- **DI**: Hilt + KSP
+- **Database**: ObjectBox 4.0.3 with HNSW vector indexing
+- **Navigation**: Compose Navigation
+- **Build**: Gradle 8.7, AGP 8.5.2, min SDK 26, target SDK 34
+
+## Project Layout
+
+```
+app/src/main/java/com/zerosignal/cognitedge/
+├── MainActivity.kt                    ComponentActivity + Compose setContent
+├── ZeroSignalApp.kt                   @HiltAndroidApp
+├── RagViewModel.kt                    @HiltViewModel, chat state + streaming
+└── ui/
+    ├── theme/                         Dark theme (Color, Type, Theme)
+    ├── navigation/NavGraph.kt         Setup -> Chat routes
+    ├── setup/
+    │   ├── SetupScreen.kt             Model download UI with progress
+    │   └── SetupViewModel.kt          Download state management
+    └── chat/
+        ├── ChatScreen.kt              LazyColumn chat with auto-scroll
+        └── components/
+            ├── MessageBubble.kt        User/assistant bubbles + markdown
+            └── ChatInputBar.kt         Text input + send button
+
+core/domain/src/main/java/.../domain/
+├── model/                             ResponseChunk, ContextChunk, ChatMessage, etc.
+├── repository/                        InferenceRepository, ContextRepository, ModelRepository
+└── usecase/AskQuestionUseCase.kt      RAG orchestrator
+
+core/ai/src/main/java/.../ai/
+├── engine/                            NexaInferenceEngine, FakeEngine, NexaSdkEngine, NexaRuntime
+├── catalog/NexaModelCatalog.kt        Snapdragon-ready model configs
+├── repository/                        NexaInferenceRepository, NexaModelRepository
+└── di/AiModule.kt                     Hilt bindings + NPU detection
+
+core/data/src/main/java/.../data/
+├── database/entity/VectorChunkEntity  @Entity with @HnswIndex(768-dim)
+├── database/ObjectBoxProvider.kt      Singleton BoxStore
+├── loader/                            ContextPackLoader, ContextPackParser, ContextPackIngester
+├── search/                            ContextRetriever, QueryVectorizer, Similarity
+├── prompt/PromptBuilder.kt            Llama 3.2 chat template
+├── repository/                        ObjectBoxContextRepository, LocalContextRepository
+└── di/DataModule.kt                   Hilt bindings
+```
+
+## Building & Running
+
+```bash
+# Build debug APK
+./gradlew :app:assembleDebug
+
+# APK location
+app/build/outputs/apk/debug/app-debug.apk
+
+# Run tests
+./gradlew test
+```
+
+1. Open in Android Studio (Hedgehog+).
+2. Sync Gradle.
+3. Run on emulator — Setup screen auto-detects emulator and offers "Continue (Demo Mode)".
+4. On Qualcomm Cloud device — Setup screen shows model download progress, then navigates to Chat.
+
+## Replacing the Fake Engine with Real Nexa SDK
+
+When the `ai.nexa:core` artifact is available:
+
+1. Uncomment the dependency in `core/ai/build.gradle.kts`
+2. Implement real calls in `NexaSdkEngine.kt` (replace the stub with `LlmWrapper.builder()`)
+3. Implement real download in `NexaModelRepository.kt` (replace simulated progress)
+4. The `AiModule` already handles NPU detection — no other changes needed
 
 ## Tests
-`./gradlew test` runs a small unit test that verifies the retrieval stack stays deterministic.
+
+```bash
+./gradlew test
+```
+
+`AskQuestionUseCaseTest` verifies the retrieval + inference pipeline with mock repositories, including source attribution.
