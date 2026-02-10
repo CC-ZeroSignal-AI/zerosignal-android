@@ -16,3 +16,6 @@ dependencyResolutionManagement {
 
 rootProject.name = "ZS-android"
 include(":app")
+include(":core:domain")
+include(":core:ai")
+include(":core:data")

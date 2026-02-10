@@ -2,6 +2,7 @@
 .gradle/
 build/
 **/build/
+local.properties
 
 # ===== IntelliJ / JetBrains =====
 .idea/
@@ -31,6 +32,25 @@ out/
 
 # ===== Java / Kotlin =====
 *.class
+
+# ===== Android build outputs =====
+*.apk
+*.aab
+*.ap_
+*.dex
+output.json
+
+# ===== Native / NDK =====
+.externalNativeBuild/
+.cxx/
+
+# ===== Signing (do not commit keys) =====
+*.jks
+*.keystore
+
+# ===== Android Studio =====
+capture/
+*.hprof
 
 # ===== Misc =====
 hs_err_pid*
