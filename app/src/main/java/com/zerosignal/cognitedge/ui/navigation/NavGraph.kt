@@ -4,12 +4,11 @@ import androidx.compose.runtime.Composable
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
-import com.zerosignal.cognitedge.ui.chat.ChatScreen
 import com.zerosignal.cognitedge.ui.setup.SetupScreen
 
 object Routes {
     const val SETUP = "setup"
-    const val CHAT = "chat"
+    const val MAIN = "main"
 }
 
 @Composable
@@ -20,14 +19,14 @@ fun NavGraph() {
         composable(Routes.SETUP) {
             SetupScreen(
                 onContinue = {
-                    navController.navigate(Routes.CHAT) {
+                    navController.navigate(Routes.MAIN) {
                         popUpTo(Routes.SETUP) { inclusive = true }
                     }
                 }
             )
         }
-        composable(Routes.CHAT) {
-            ChatScreen()
+        composable(Routes.MAIN) {
+            MainScreen()
         }
     }
 }
