@@ -1,8 +1,14 @@
 package com.zerosignal.cognitedge.ui.chat.components
 
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -12,9 +18,10 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.Alignment
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
@@ -23,6 +30,9 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.zerosignal.cognitedge.domain.model.ChatMessage
 import com.zerosignal.cognitedge.ui.theme.AssistantBubble
+import com.zerosignal.cognitedge.ui.theme.GradientEnd
+import com.zerosignal.cognitedge.ui.theme.GradientStart
+import com.zerosignal.cognitedge.ui.theme.NeonCyan
 import com.zerosignal.cognitedge.ui.theme.UserBubble
 import com.zerosignal.cognitedge.ui.theme.ZeroSignalTheme
 
@@ -32,29 +42,45 @@ fun MessageBubble(message: ChatMessage) {
     val bubbleColor = if (isUser) UserBubble else AssistantBubble
     val alignment = if (isUser) Arrangement.End else Arrangement.Start
 
+    val shape = RoundedCornerShape(
+        topStart = 18.dp,
+        topEnd = 18.dp,
+        bottomStart = if (isUser) 18.dp else 4.dp,
+        bottomEnd = if (isUser) 4.dp else 18.dp
+    )
+
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 12.dp, vertical = 4.dp),
+            .padding(horizontal = 12.dp, vertical = 3.dp),
         horizontalArrangement = alignment
     ) {
         Column(
             modifier = Modifier
-                .widthIn(max = 300.dp)
-                .clip(RoundedCornerShape(
-                    topStart = 16.dp,
-                    topEnd = 16.dp,
-                    bottomStart = if (isUser) 16.dp else 4.dp,
-                    bottomEnd = if (isUser) 4.dp else 16.dp
-                ))
+                .widthIn(max = 320.dp)
+                .clip(shape)
+                .then(
+                    if (!isUser) {
+                        Modifier.border(
+                            width = 0.5.dp,
+                            brush = Brush.linearGradient(
+                                colors = listOf(
+                                    GradientStart.copy(alpha = 0.2f),
+                                    GradientEnd.copy(alpha = 0.1f)
+                                )
+                            ),
+                            shape = shape
+                        )
+                    } else Modifier
+                )
                 .background(bubbleColor)
-                .padding(12.dp)
+                .padding(14.dp)
         ) {
             if (!isUser) {
                 Text(
                     text = "ZeroSignal",
-                    style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.primary,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = NeonCyan.copy(alpha = 0.7f),
                     modifier = Modifier.padding(bottom = 4.dp)
                 )
             }
@@ -66,18 +92,28 @@ fun MessageBubble(message: ChatMessage) {
 
             if (message.sourcesUsed.isNotEmpty()) {
                 Text(
-                    text = "Sources: ${message.sourcesUsed.joinToString(", ")}",
-                    style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f),
+                    text = "${message.sourcesUsed.size} sources",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = NeonCyan.copy(alpha = 0.4f),
                     modifier = Modifier.padding(top = 8.dp)
                 )
             }
 
             if (message.isStreaming) {
+                val transition = rememberInfiniteTransition(label = "cursor")
+                val alpha by transition.animateFloat(
+                    initialValue = 1f,
+                    targetValue = 0.2f,
+                    animationSpec = infiniteRepeatable(
+                        animation = tween(500, easing = LinearEasing),
+                        repeatMode = RepeatMode.Reverse
+                    ),
+                    label = "cursorBlink"
+                )
                 Text(
                     text = "\u2588",
                     style = MaterialTheme.typography.bodyLarge,
-                    color = MaterialTheme.colorScheme.primary.copy(alpha = 0.7f)
+                    color = NeonCyan.copy(alpha = alpha)
                 )
             }
         }
@@ -121,7 +157,7 @@ private fun MarkdownText(
     )
 }
 
-@Preview(showBackground = true, backgroundColor = 0xFF121212)
+@Preview(showBackground = true, backgroundColor = 0xFF0A0A0F)
 @Composable
 private fun UserBubblePreview() {
     ZeroSignalTheme {
@@ -135,7 +171,7 @@ private fun UserBubblePreview() {
     }
 }
 
-@Preview(showBackground = true, backgroundColor = 0xFF121212)
+@Preview(showBackground = true, backgroundColor = 0xFF0A0A0F)
 @Composable
 private fun AssistantBubblePreview() {
     ZeroSignalTheme {

@@ -24,6 +24,10 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -32,6 +36,8 @@ import com.zerosignal.cognitedge.RagViewModel
 import com.zerosignal.cognitedge.domain.model.ChatMessage
 import com.zerosignal.cognitedge.ui.chat.components.ChatInputBar
 import com.zerosignal.cognitedge.ui.chat.components.MessageBubble
+import com.zerosignal.cognitedge.ui.theme.GradientEnd
+import com.zerosignal.cognitedge.ui.theme.GradientStart
 import com.zerosignal.cognitedge.ui.theme.ZeroSignalTheme
 
 @Composable
@@ -62,7 +68,6 @@ private fun ChatScreenContent(
     val listState = rememberLazyListState()
     val messages = uiState.messages
 
-    // Auto-scroll: track if user has scrolled up manually
     val isAtBottom by remember {
         derivedStateOf {
             val lastVisibleItem = listState.layoutInfo.visibleItemsInfo.lastOrNull()
@@ -70,7 +75,6 @@ private fun ChatScreenContent(
         }
     }
 
-    // Auto-scroll to bottom when new messages arrive (if user is at bottom)
     LaunchedEffect(messages.size, messages.lastOrNull()?.content?.length) {
         if (messages.isNotEmpty() && isAtBottom) {
             listState.animateScrollToItem(messages.size - 1)
@@ -82,7 +86,6 @@ private fun ChatScreenContent(
             .fillMaxSize()
             .background(MaterialTheme.colorScheme.background)
     ) {
-        // Messages list
         LazyColumn(
             state = listState,
             modifier = Modifier
@@ -99,15 +102,30 @@ private fun ChatScreenContent(
                     ) {
                         Column(horizontalAlignment = Alignment.CenterHorizontally) {
                             Text(
-                                text = "ZeroSignal AI",
-                                style = MaterialTheme.typography.headlineMedium,
-                                color = MaterialTheme.colorScheme.primary.copy(alpha = 0.5f)
+                                text = buildAnnotatedString {
+                                    withStyle(
+                                        SpanStyle(
+                                            brush = Brush.linearGradient(
+                                                colors = listOf(GradientStart, GradientEnd)
+                                            )
+                                        )
+                                    ) {
+                                        append("ZeroSignal")
+                                    }
+                                },
+                                style = MaterialTheme.typography.headlineLarge
                             )
-                            Spacer(modifier = Modifier.height(8.dp))
+                            Spacer(modifier = Modifier.height(4.dp))
                             Text(
-                                text = "Ask me anything...",
-                                style = MaterialTheme.typography.bodyLarge,
+                                text = "Offline Intelligence",
+                                style = MaterialTheme.typography.bodyMedium,
                                 color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.3f)
+                            )
+                            Spacer(modifier = Modifier.height(24.dp))
+                            Text(
+                                text = "Ask anything about your downloaded packs",
+                                style = MaterialTheme.typography.bodyLarge,
+                                color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.2f)
                             )
                         }
                     }
@@ -118,7 +136,6 @@ private fun ChatScreenContent(
                 MessageBubble(message = message)
             }
 
-            // Error message
             if (uiState.errorMessage != null) {
                 item {
                     Text(
@@ -130,11 +147,9 @@ private fun ChatScreenContent(
                 }
             }
 
-            // Bottom padding
             item { Spacer(modifier = Modifier.height(8.dp)) }
         }
 
-        // Input bar
         ChatInputBar(
             inputText = inputText,
             onInputChange = onInputChange,
@@ -144,7 +159,7 @@ private fun ChatScreenContent(
     }
 }
 
-@Preview(showBackground = true, backgroundColor = 0xFF121212)
+@Preview(showBackground = true, backgroundColor = 0xFF0A0A0F)
 @Composable
 private fun ChatScreenEmptyPreview() {
     ZeroSignalTheme {
@@ -157,7 +172,7 @@ private fun ChatScreenEmptyPreview() {
     }
 }
 
-@Preview(showBackground = true, backgroundColor = 0xFF121212)
+@Preview(showBackground = true, backgroundColor = 0xFF0A0A0F)
 @Composable
 private fun ChatScreenWithMessagesPreview() {
     ZeroSignalTheme {
