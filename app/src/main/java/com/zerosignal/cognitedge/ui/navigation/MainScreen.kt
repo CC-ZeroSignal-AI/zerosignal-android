@@ -5,9 +5,9 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Chat
+import androidx.compose.material.icons.automirrored.filled.Chat
 import androidx.compose.material.icons.filled.Inventory2
-import androidx.compose.material.icons.outlined.Chat
+import androidx.compose.material.icons.outlined.ChatBubbleOutline
 import androidx.compose.material.icons.outlined.Inventory2
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -26,9 +26,11 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.dp
 import com.zerosignal.cognitedge.ui.chat.ChatScreen
 import com.zerosignal.cognitedge.ui.store.PackStoreScreen
+import com.zerosignal.cognitedge.ui.theme.Accent
 import com.zerosignal.cognitedge.ui.theme.NavBarIndicator
 import com.zerosignal.cognitedge.ui.theme.NavBarSurface
-import com.zerosignal.cognitedge.ui.theme.NeonCyan
+import com.zerosignal.cognitedge.ui.theme.TextPrimary
+import com.zerosignal.cognitedge.ui.theme.TextQuaternary
 
 private data class BottomNavItem(
     val label: String,
@@ -37,7 +39,7 @@ private data class BottomNavItem(
 )
 
 private val navItems = listOf(
-    BottomNavItem("Chat", Icons.Filled.Chat, Icons.Outlined.Chat),
+    BottomNavItem("Chat", Icons.AutoMirrored.Filled.Chat, Icons.Outlined.ChatBubbleOutline),
     BottomNavItem("Packs", Icons.Filled.Inventory2, Icons.Outlined.Inventory2)
 )
 
@@ -68,10 +70,10 @@ fun MainScreen() {
                             )
                         },
                         colors = NavigationBarItemDefaults.colors(
-                            selectedIconColor = NeonCyan,
-                            selectedTextColor = NeonCyan,
-                            unselectedIconColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f),
-                            unselectedTextColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f),
+                            selectedIconColor = TextPrimary,
+                            selectedTextColor = TextPrimary,
+                            unselectedIconColor = TextQuaternary,
+                            unselectedTextColor = TextQuaternary,
                             indicatorColor = NavBarIndicator
                         )
                     )

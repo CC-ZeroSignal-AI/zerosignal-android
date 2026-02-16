@@ -19,9 +19,9 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.CloudOff
-import androidx.compose.material.icons.filled.Refresh
-import androidx.compose.material.icons.filled.Inventory2
+import androidx.compose.material.icons.outlined.CloudOff
+import androidx.compose.material.icons.outlined.Inventory2
+import androidx.compose.material.icons.outlined.Refresh
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -34,21 +34,18 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.text.SpanStyle
-import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.zerosignal.cognitedge.ui.store.components.PackCard
 import com.zerosignal.cognitedge.ui.store.components.PackSearchBar
-import com.zerosignal.cognitedge.ui.theme.DownloadedGreen
-import com.zerosignal.cognitedge.ui.theme.ElectricPurple
-import com.zerosignal.cognitedge.ui.theme.GradientEnd
-import com.zerosignal.cognitedge.ui.theme.GradientStart
-import com.zerosignal.cognitedge.ui.theme.NeonCyan
-import com.zerosignal.cognitedge.ui.theme.SurfaceElevated
+import com.zerosignal.cognitedge.ui.theme.Accent
+import com.zerosignal.cognitedge.ui.theme.Success
+import com.zerosignal.cognitedge.ui.theme.Surface3
+import com.zerosignal.cognitedge.ui.theme.TextPrimary
+import com.zerosignal.cognitedge.ui.theme.TextQuaternary
+import com.zerosignal.cognitedge.ui.theme.TextSecondary
+import com.zerosignal.cognitedge.ui.theme.TextTertiary
 
 @Composable
 fun PackStoreScreen(viewModel: PackStoreViewModel = hiltViewModel()) {
@@ -69,32 +66,23 @@ fun PackStoreScreen(viewModel: PackStoreViewModel = hiltViewModel()) {
         ) {
             Column {
                 Text(
-                    text = buildAnnotatedString {
-                        withStyle(
-                            SpanStyle(
-                                brush = Brush.linearGradient(
-                                    colors = listOf(GradientStart, GradientEnd)
-                                )
-                            )
-                        ) {
-                            append("Pack Store")
-                        }
-                    },
+                    text = "Pack Store",
                     style = MaterialTheme.typography.headlineMedium,
+                    color = TextPrimary,
                     fontWeight = FontWeight.Bold
                 )
                 Spacer(modifier = Modifier.height(2.dp))
                 Text(
-                    text = "Download knowledge packs for offline AI",
+                    text = "Knowledge packs for offline AI",
                     style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f)
+                    color = TextTertiary
                 )
             }
             IconButton(onClick = { viewModel.loadPacks() }) {
                 Icon(
-                    Icons.Default.Refresh,
+                    Icons.Outlined.Refresh,
                     contentDescription = "Refresh",
-                    tint = NeonCyan.copy(alpha = 0.7f)
+                    tint = TextTertiary
                 )
             }
         }
@@ -116,15 +104,15 @@ fun PackStoreScreen(viewModel: PackStoreViewModel = hiltViewModel()) {
                 ) {
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
                         CircularProgressIndicator(
-                            color = NeonCyan,
-                            strokeWidth = 3.dp,
-                            modifier = Modifier.size(40.dp)
+                            color = TextTertiary,
+                            strokeWidth = 2.dp,
+                            modifier = Modifier.size(32.dp)
                         )
                         Spacer(modifier = Modifier.height(16.dp))
                         Text(
-                            text = "Loading packs...",
+                            text = "Loading packs",
                             style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
+                            color = TextTertiary
                         )
                     }
                 }
@@ -138,26 +126,26 @@ fun PackStoreScreen(viewModel: PackStoreViewModel = hiltViewModel()) {
                 ) {
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
                         Icon(
-                            Icons.Default.CloudOff,
+                            Icons.Outlined.CloudOff,
                             contentDescription = null,
-                            tint = MaterialTheme.colorScheme.error.copy(alpha = 0.6f),
-                            modifier = Modifier.size(48.dp)
+                            tint = TextQuaternary,
+                            modifier = Modifier.size(40.dp)
                         )
                         Spacer(modifier = Modifier.height(16.dp))
                         Text(
                             text = "Couldn't reach the server",
                             style = MaterialTheme.typography.titleSmall,
-                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
+                            color = TextSecondary
                         )
                         Spacer(modifier = Modifier.height(4.dp))
                         Text(
                             text = uiState.error ?: "",
                             style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.3f)
+                            color = TextQuaternary
                         )
-                        Spacer(modifier = Modifier.height(16.dp))
+                        Spacer(modifier = Modifier.height(20.dp))
                         TextButton(onClick = { viewModel.loadPacks() }) {
-                            Text("Retry", color = NeonCyan)
+                            Text("Retry", color = Accent)
                         }
                     }
                 }
@@ -173,13 +161,13 @@ fun PackStoreScreen(viewModel: PackStoreViewModel = hiltViewModel()) {
                         Text(
                             text = "No packs found",
                             style = MaterialTheme.typography.titleSmall,
-                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
+                            color = TextSecondary
                         )
                         Spacer(modifier = Modifier.height(4.dp))
                         Text(
                             text = "Try a different search term",
                             style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.3f)
+                            color = TextQuaternary
                         )
                     }
                 }
@@ -193,22 +181,22 @@ fun PackStoreScreen(viewModel: PackStoreViewModel = hiltViewModel()) {
                 ) {
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
                         Icon(
-                            Icons.Default.Inventory2,
+                            Icons.Outlined.Inventory2,
                             contentDescription = null,
-                            tint = ElectricPurple.copy(alpha = 0.3f),
-                            modifier = Modifier.size(56.dp)
+                            tint = TextQuaternary,
+                            modifier = Modifier.size(40.dp)
                         )
                         Spacer(modifier = Modifier.height(16.dp))
                         Text(
                             text = "No packs available",
                             style = MaterialTheme.typography.titleSmall,
-                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
+                            color = TextSecondary
                         )
                         Spacer(modifier = Modifier.height(4.dp))
                         Text(
-                            text = "Packs will appear here once ingested into the server",
+                            text = "Packs will appear here once ingested",
                             style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.3f)
+                            color = TextQuaternary
                         )
                     }
                 }
@@ -224,26 +212,26 @@ fun PackStoreScreen(viewModel: PackStoreViewModel = hiltViewModel()) {
                         modifier = Modifier
                             .fillMaxWidth()
                             .padding(horizontal = 20.dp, vertical = 8.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
                             modifier = Modifier
                                 .clip(RoundedCornerShape(8.dp))
-                                .background(SurfaceElevated)
+                                .background(Surface3)
                                 .padding(horizontal = 10.dp, vertical = 5.dp)
                         ) {
                             Text(
                                 text = "${uiState.filteredPacks.size}",
                                 style = MaterialTheme.typography.labelLarge,
-                                color = NeonCyan,
-                                fontWeight = FontWeight.Bold
+                                color = TextPrimary,
+                                fontWeight = FontWeight.SemiBold
                             )
                             Spacer(modifier = Modifier.width(4.dp))
                             Text(
                                 text = if (uiState.filteredPacks.size == 1) "pack" else "packs",
                                 style = MaterialTheme.typography.labelMedium,
-                                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f)
+                                color = TextTertiary
                             )
                         }
                         val downloadedCount = uiState.filteredPacks.count { it.isDownloaded }
@@ -252,20 +240,20 @@ fun PackStoreScreen(viewModel: PackStoreViewModel = hiltViewModel()) {
                                 verticalAlignment = Alignment.CenterVertically,
                                 modifier = Modifier
                                     .clip(RoundedCornerShape(8.dp))
-                                    .background(SurfaceElevated)
+                                    .background(Surface3)
                                     .padding(horizontal = 10.dp, vertical = 5.dp)
                             ) {
                                 Text(
                                     text = "$downloadedCount",
                                     style = MaterialTheme.typography.labelLarge,
-                                    color = DownloadedGreen,
-                                    fontWeight = FontWeight.Bold
+                                    color = Success,
+                                    fontWeight = FontWeight.SemiBold
                                 )
                                 Spacer(modifier = Modifier.width(4.dp))
                                 Text(
                                     text = "downloaded",
                                     style = MaterialTheme.typography.labelMedium,
-                                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f)
+                                    color = TextTertiary
                                 )
                             }
                         }

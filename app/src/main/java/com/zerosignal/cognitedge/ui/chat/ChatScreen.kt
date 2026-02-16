@@ -1,5 +1,8 @@
 package com.zerosignal.cognitedge.ui.chat
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.slideInVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -11,6 +14,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -24,10 +28,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.text.SpanStyle
-import androidx.compose.ui.text.buildAnnotatedString
-import androidx.compose.ui.text.withStyle
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -36,8 +37,9 @@ import com.zerosignal.cognitedge.RagViewModel
 import com.zerosignal.cognitedge.domain.model.ChatMessage
 import com.zerosignal.cognitedge.ui.chat.components.ChatInputBar
 import com.zerosignal.cognitedge.ui.chat.components.MessageBubble
-import com.zerosignal.cognitedge.ui.theme.GradientEnd
-import com.zerosignal.cognitedge.ui.theme.GradientStart
+import com.zerosignal.cognitedge.ui.theme.BorderMuted
+import com.zerosignal.cognitedge.ui.theme.TextQuaternary
+import com.zerosignal.cognitedge.ui.theme.TextTertiary
 import com.zerosignal.cognitedge.ui.theme.ZeroSignalTheme
 
 @Composable
@@ -97,35 +99,27 @@ private fun ChatScreenContent(
                     Box(
                         modifier = Modifier
                             .fillParentMaxSize()
-                            .padding(32.dp),
+                            .padding(horizontal = 40.dp),
                         contentAlignment = Alignment.Center
                     ) {
                         Column(horizontalAlignment = Alignment.CenterHorizontally) {
                             Text(
-                                text = buildAnnotatedString {
-                                    withStyle(
-                                        SpanStyle(
-                                            brush = Brush.linearGradient(
-                                                colors = listOf(GradientStart, GradientEnd)
-                                            )
-                                        )
-                                    ) {
-                                        append("ZeroSignal")
-                                    }
-                                },
-                                style = MaterialTheme.typography.headlineLarge
+                                text = "ZeroSignal",
+                                style = MaterialTheme.typography.displaySmall,
+                                color = MaterialTheme.colorScheme.onBackground,
+                                fontWeight = FontWeight.Bold
                             )
-                            Spacer(modifier = Modifier.height(4.dp))
+                            Spacer(modifier = Modifier.height(6.dp))
                             Text(
                                 text = "Offline Intelligence",
                                 style = MaterialTheme.typography.bodyMedium,
-                                color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.3f)
+                                color = TextTertiary
                             )
-                            Spacer(modifier = Modifier.height(24.dp))
+                            Spacer(modifier = Modifier.height(40.dp))
                             Text(
                                 text = "Ask anything about your downloaded packs",
-                                style = MaterialTheme.typography.bodyLarge,
-                                color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.2f)
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = TextQuaternary
                             )
                         }
                     }
@@ -140,15 +134,17 @@ private fun ChatScreenContent(
                 item {
                     Text(
                         text = uiState.errorMessage,
-                        style = MaterialTheme.typography.bodyMedium,
+                        style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.error,
-                        modifier = Modifier.padding(16.dp)
+                        modifier = Modifier.padding(horizontal = 20.dp, vertical = 12.dp)
                     )
                 }
             }
 
             item { Spacer(modifier = Modifier.height(8.dp)) }
         }
+
+        HorizontalDivider(color = BorderMuted, thickness = 0.5.dp)
 
         ChatInputBar(
             inputText = inputText,
@@ -159,7 +155,7 @@ private fun ChatScreenContent(
     }
 }
 
-@Preview(showBackground = true, backgroundColor = 0xFF0A0A0F)
+@Preview(showBackground = true, backgroundColor = 0xFF09090B)
 @Composable
 private fun ChatScreenEmptyPreview() {
     ZeroSignalTheme {
@@ -172,7 +168,7 @@ private fun ChatScreenEmptyPreview() {
     }
 }
 
-@Preview(showBackground = true, backgroundColor = 0xFF0A0A0F)
+@Preview(showBackground = true, backgroundColor = 0xFF09090B)
 @Composable
 private fun ChatScreenWithMessagesPreview() {
     ZeroSignalTheme {
