@@ -7,10 +7,10 @@ plugins {
 
 android {
     namespace = "com.zerosignal.cognitedge.ai"
-    compileSdk = 34
+    compileSdk = 35
 
     defaultConfig {
-        minSdk = 26
+        minSdk = 27
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         consumerProguardFiles("consumer-rules.pro")
     }
@@ -33,8 +33,8 @@ dependencies {
 
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.8.1")
 
-    // Nexa SDK - optional, compile-only reference; real artifact provided at runtime on device
-    // implementation("ai.nexa:core:0.0.22")
+    // Nexa SDK for on-device LLM inference
+    implementation("ai.nexa:core:0.0.22")
 
     testImplementation("junit:junit:4.13.2")
 }

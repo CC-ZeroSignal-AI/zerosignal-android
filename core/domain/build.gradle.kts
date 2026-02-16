@@ -5,10 +5,10 @@ plugins {
 
 android {
     namespace = "com.zerosignal.cognitedge.domain"
-    compileSdk = 34
+    compileSdk = 35
 
     defaultConfig {
-        minSdk = 26
+        minSdk = 27
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         consumerProguardFiles("consumer-rules.pro")
     }

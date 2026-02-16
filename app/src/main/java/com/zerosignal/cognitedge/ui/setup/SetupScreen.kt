@@ -10,7 +10,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Button
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -30,7 +29,7 @@ fun SetupScreen(
     viewModel: SetupViewModel = hiltViewModel()
 ) {
     val downloadState by viewModel.downloadState.collectAsState()
-    val isEmulator by viewModel.isEmulator.collectAsState()
+    val isDeviceSupported by viewModel.isDeviceSupported.collectAsState()
 
     LaunchedEffect(downloadState) {
         if (downloadState is ModelDownloadState.Ready) {
@@ -40,9 +39,8 @@ fun SetupScreen(
 
     SetupScreenContent(
         downloadState = downloadState,
-        isEmulator = isEmulator,
+        isDeviceSupported = isDeviceSupported,
         onStartDownload = { viewModel.startDownload() },
-        onSkip = { viewModel.skipSetup() },
         onRetry = { viewModel.startDownload() }
     )
 }
@@ -50,9 +48,8 @@ fun SetupScreen(
 @Composable
 private fun SetupScreenContent(
     downloadState: ModelDownloadState,
-    isEmulator: Boolean,
+    isDeviceSupported: Boolean,
     onStartDownload: () -> Unit,
-    onSkip: () -> Unit,
     onRetry: () -> Unit
 ) {
     Column(
@@ -78,19 +75,22 @@ private fun SetupScreenContent(
 
         Spacer(modifier = Modifier.height(48.dp))
 
-        when (downloadState) {
-            is ModelDownloadState.NotStarted -> {
-                if (isEmulator) {
-                    Text(
-                        text = "Emulator detected — using demo mode",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.6f)
-                    )
-                    Spacer(modifier = Modifier.height(16.dp))
-                    Button(onClick = onSkip) {
-                        Text("Continue (Demo Mode)")
-                    }
-                } else {
+        if (!isDeviceSupported) {
+            Text(
+                text = "Unsupported Device",
+                style = MaterialTheme.typography.titleMedium,
+                color = MaterialTheme.colorScheme.error
+            )
+            Spacer(modifier = Modifier.height(12.dp))
+            Text(
+                text = "This app requires a Qualcomm Snapdragon device with NPU support. " +
+                    "Emulators and non-Snapdragon devices are not supported.",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.7f)
+            )
+        } else {
+            when (downloadState) {
+                is ModelDownloadState.NotStarted -> {
                     Text(
                         text = "Download Llama 3.2 3B model for NPU inference",
                         style = MaterialTheme.typography.bodyMedium,
@@ -100,76 +100,68 @@ private fun SetupScreenContent(
                     Button(onClick = onStartDownload) {
                         Text("Download Model")
                     }
+                }
+
+                is ModelDownloadState.Downloading -> {
+                    val progress = downloadState.progress
+                    val mb = downloadState.bytesDownloaded / 1_000_000
+                    Text(
+                        text = "Downloading model... ${(progress * 100).toInt()}%",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onBackground
+                    )
+                    Spacer(modifier = Modifier.height(12.dp))
+                    LinearProgressIndicator(
+                        progress = { progress },
+                        modifier = Modifier.fillMaxWidth(),
+                        color = MaterialTheme.colorScheme.primary
+                    )
                     Spacer(modifier = Modifier.height(8.dp))
-                    OutlinedButton(onClick = onSkip) {
-                        Text("Skip (Demo Mode)")
+                    Text(
+                        text = "${mb} MB downloaded",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.5f)
+                    )
+                }
+
+                is ModelDownloadState.Verifying -> {
+                    Text(
+                        text = "Verifying model integrity...",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onBackground
+                    )
+                    Spacer(modifier = Modifier.height(12.dp))
+                    LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
+                }
+
+                is ModelDownloadState.Initializing -> {
+                    Text(
+                        text = "Initializing NPU runtime...",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onBackground
+                    )
+                    Spacer(modifier = Modifier.height(12.dp))
+                    LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
+                }
+
+                is ModelDownloadState.Ready -> {
+                    Text(
+                        text = "Ready!",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                }
+
+                is ModelDownloadState.Error -> {
+                    Text(
+                        text = "Error: ${downloadState.message}",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.error
+                    )
+                    Spacer(modifier = Modifier.height(16.dp))
+                    Button(onClick = onRetry) {
+                        Text("Retry")
                     }
-                }
-            }
-
-            is ModelDownloadState.Downloading -> {
-                val progress = downloadState.progress
-                val mb = downloadState.bytesDownloaded / 1_000_000
-                Text(
-                    text = "Downloading model... ${(progress * 100).toInt()}%",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onBackground
-                )
-                Spacer(modifier = Modifier.height(12.dp))
-                LinearProgressIndicator(
-                    progress = { progress },
-                    modifier = Modifier.fillMaxWidth(),
-                    color = MaterialTheme.colorScheme.primary
-                )
-                Spacer(modifier = Modifier.height(8.dp))
-                Text(
-                    text = "${mb} MB downloaded",
-                    style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.5f)
-                )
-            }
-
-            is ModelDownloadState.Verifying -> {
-                Text(
-                    text = "Verifying model integrity...",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onBackground
-                )
-                Spacer(modifier = Modifier.height(12.dp))
-                LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
-            }
-
-            is ModelDownloadState.Initializing -> {
-                Text(
-                    text = "Initializing NPU runtime...",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onBackground
-                )
-                Spacer(modifier = Modifier.height(12.dp))
-                LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
-            }
-
-            is ModelDownloadState.Ready -> {
-                Text(
-                    text = "Ready!",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.primary
-                )
-            }
-
-            is ModelDownloadState.Error -> {
-                Text(
-                    text = "Error: ${downloadState.message}",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.error
-                )
-                Spacer(modifier = Modifier.height(16.dp))
-                Button(onClick = onRetry) {
-                    Text("Retry")
-                }
-                Spacer(modifier = Modifier.height(8.dp))
-                OutlinedButton(onClick = onSkip) {
-                    Text("Continue in Demo Mode")
                 }
             }
         }
@@ -182,9 +174,8 @@ private fun SetupScreenNotStartedPreview() {
     ZeroSignalTheme {
         SetupScreenContent(
             downloadState = ModelDownloadState.NotStarted,
-            isEmulator = false,
+            isDeviceSupported = true,
             onStartDownload = {},
-            onSkip = {},
             onRetry = {}
         )
     }
@@ -196,9 +187,21 @@ private fun SetupScreenDownloadingPreview() {
     ZeroSignalTheme {
         SetupScreenContent(
             downloadState = ModelDownloadState.Downloading(0.65f, 1_950_000_000L),
-            isEmulator = false,
+            isDeviceSupported = true,
             onStartDownload = {},
-            onSkip = {},
+            onRetry = {}
+        )
+    }
+}
+
+@Preview(showBackground = true, backgroundColor = 0xFF121212)
+@Composable
+private fun SetupScreenUnsupportedPreview() {
+    ZeroSignalTheme {
+        SetupScreenContent(
+            downloadState = ModelDownloadState.NotStarted,
+            isDeviceSupported = false,
+            onStartDownload = {},
             onRetry = {}
         )
     }

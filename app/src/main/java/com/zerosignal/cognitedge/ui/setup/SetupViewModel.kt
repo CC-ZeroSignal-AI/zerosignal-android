@@ -2,6 +2,7 @@ package com.zerosignal.cognitedge.ui.setup
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.zerosignal.cognitedge.ai.di.DeviceCapability
 import com.zerosignal.cognitedge.domain.model.ModelDownloadState
 import com.zerosignal.cognitedge.domain.repository.ModelRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -19,19 +20,16 @@ class SetupViewModel @Inject constructor(
     private val _downloadState = MutableStateFlow<ModelDownloadState>(ModelDownloadState.NotStarted)
     val downloadState: StateFlow<ModelDownloadState> = _downloadState.asStateFlow()
 
-    private val _isEmulator = MutableStateFlow(false)
-    val isEmulator: StateFlow<Boolean> = _isEmulator.asStateFlow()
+    private val _isDeviceSupported = MutableStateFlow(true)
+    val isDeviceSupported: StateFlow<Boolean> = _isDeviceSupported.asStateFlow()
 
     init {
         checkDevice()
     }
 
     private fun checkDevice() {
-        val fingerprint = android.os.Build.FINGERPRINT
-        val model = android.os.Build.MODEL
-        _isEmulator.value = fingerprint.contains("generic", ignoreCase = true)
-            || model.contains("Emulator", ignoreCase = true)
-            || model.contains("Android SDK", ignoreCase = true)
+        val capability = DeviceCapability.detect()
+        _isDeviceSupported.value = !capability.isEmulator && capability.isSnapdragon
     }
 
     fun startDownload() {
@@ -40,9 +38,5 @@ class SetupViewModel @Inject constructor(
                 _downloadState.value = state
             }
         }
-    }
-
-    fun skipSetup() {
-        _downloadState.value = ModelDownloadState.Ready
     }
 }

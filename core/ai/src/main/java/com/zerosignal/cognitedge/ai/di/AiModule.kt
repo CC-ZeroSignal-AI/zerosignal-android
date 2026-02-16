@@ -2,11 +2,12 @@ package com.zerosignal.cognitedge.ai.di
 
 import android.content.Context
 import android.os.Build
-import com.zerosignal.cognitedge.ai.engine.FakeNexaInferenceEngine
+import com.nexa.sdk.NexaSdk
 import com.zerosignal.cognitedge.ai.engine.NexaInferenceEngine
 import com.zerosignal.cognitedge.ai.engine.NexaSdkEngine
 import com.zerosignal.cognitedge.ai.repository.NexaInferenceRepository
 import com.zerosignal.cognitedge.ai.repository.NexaModelRepository
+import com.zerosignal.cognitedge.domain.model.UnsupportedDeviceException
 import com.zerosignal.cognitedge.domain.repository.InferenceRepository
 import com.zerosignal.cognitedge.domain.repository.ModelRepository
 import dagger.Binds
@@ -41,24 +42,43 @@ abstract class AiModule {
             modelRepository: ModelRepository
         ): NexaInferenceEngine {
             val deviceInfo = DeviceCapability.detect()
-            return when {
-                deviceInfo.isEmulator -> FakeNexaInferenceEngine()
-                deviceInfo.isSnapdragon -> {
-                    val modelPath = modelRepository.getModelPath()
-                        ?: return FakeNexaInferenceEngine()
-                    NexaSdkEngine(modelPath, pluginId = "npu")
-                }
-                else -> {
-                    val modelPath = modelRepository.getModelPath()
-                        ?: return FakeNexaInferenceEngine()
-                    NexaSdkEngine(modelPath, pluginId = "cpu_gpu")
-                }
+
+            if (deviceInfo.isEmulator || !deviceInfo.isSnapdragon) {
+                throw UnsupportedDeviceException(
+                    "This app requires a Qualcomm Snapdragon device with NPU support. " +
+                        "Emulators and non-Snapdragon devices are not supported."
+                )
             }
+
+            // Initialize Nexa SDK
+            // init takes (Context, InitCallback) but second arg is optional?
+            // If not optional, we pass null or empty callback
+            // Checking javap output: public final void init(Context, InitCallback)
+            // There is no init$default for the callback. So we must provide it.
+            // But InitCallback is an interface. We can pass a simple implementation.
+            
+            NexaSdk.getInstance().init(context, object : NexaSdk.InitCallback {
+                override fun onSuccess() {
+                    // Initialization successful
+                }
+
+                override fun onFailure(error: String) {
+                    // Initialization failed
+                    // Since this is just initialization, we might log it but can't really crash here
+                    // The engine will fail later if SDK isn't initialized
+                }
+            })
+
+            val modelPath = modelRepository.getModelPath()
+            // Model path may be null if not yet downloaded — the engine is still
+            // provided but will fail at inference time. The SetupScreen gate
+            // enforces download before reaching the chat screen.
+            return NexaSdkEngine(modelPath ?: "", pluginId = "npu")
         }
     }
 }
 
-internal data class DeviceCapability(
+data class DeviceCapability(
     val isEmulator: Boolean,
     val isSnapdragon: Boolean
 ) {
