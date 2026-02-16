@@ -67,28 +67,43 @@ class PackStoreViewModel @Inject constructor(
     }
 
     fun downloadPack(packId: String) {
+        // Prevent double-download
+        val currentProgress = _uiState.value.downloadProgress[packId]
+        if (currentProgress is PackDownloadProgress.Downloading) return
+
         viewModelScope.launch {
-            repository.downloadPack(packId).collect { progress ->
+            try {
+                repository.downloadPack(packId).collect { progress ->
+                    _uiState.update { state ->
+                        val newProgress = state.downloadProgress.toMutableMap()
+                        newProgress[packId] = progress
+
+                        val updatedPacks = if (progress is PackDownloadProgress.Completed) {
+                            state.packs.map { pack ->
+                                if (pack.packId == packId) pack.copy(isDownloaded = true) else pack
+                            }
+                        } else {
+                            state.packs.map { pack ->
+                                if (pack.packId == packId && progress is PackDownloadProgress.Downloading) {
+                                    pack.copy(downloadProgress = progress.progress)
+                                } else pack
+                            }
+                        }
+
+                        state.copy(
+                            packs = updatedPacks,
+                            filteredPacks = filterPacks(updatedPacks, state.searchQuery),
+                            downloadProgress = newProgress
+                        )
+                    }
+                }
+            } catch (e: Exception) {
                 _uiState.update { state ->
                     val newProgress = state.downloadProgress.toMutableMap()
-                    newProgress[packId] = progress
-
-                    val updatedPacks = if (progress is PackDownloadProgress.Completed) {
-                        state.packs.map { pack ->
-                            if (pack.packId == packId) pack.copy(isDownloaded = true) else pack
-                        }
-                    } else {
-                        state.packs.map { pack ->
-                            if (pack.packId == packId && progress is PackDownloadProgress.Downloading) {
-                                pack.copy(downloadProgress = progress.progress)
-                            } else pack
-                        }
-                    }
-
+                    newProgress[packId] = PackDownloadProgress.Error(e.message ?: "Download failed")
                     state.copy(
-                        packs = updatedPacks,
-                        filteredPacks = filterPacks(updatedPacks, state.searchQuery),
-                        downloadProgress = newProgress
+                        downloadProgress = newProgress,
+                        filteredPacks = filterPacks(state.packs, state.searchQuery)
                     )
                 }
             }

@@ -7,12 +7,12 @@ plugins {
 
 android {
     namespace = "com.zerosignal.cognitedge"
-    compileSdk = 34
+    compileSdk = 35
 
     defaultConfig {
         applicationId = "com.zerosignal.cognitedge"
-        minSdk = 26
-        targetSdk = 34
+        minSdk = 27
+        targetSdk = 35
         versionCode = 1
         versionName = "1.0"
 
@@ -49,6 +49,9 @@ android {
     packaging {
         resources {
             excludes += "/META-INF/{AL2.0,LGPL2.1}"
+        }
+        jniLibs {
+            useLegacyPackaging = true
         }
     }
 }

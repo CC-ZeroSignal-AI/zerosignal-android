@@ -44,7 +44,7 @@ abstract class DataModule {
     ): PackStoreRepository
 
     companion object {
-        private const val BASE_URL = "http://10.0.2.2:8000/"
+        private const val BASE_URL = "https://zerosignal-web.vercel.app/"
 
         @Provides
         @Singleton
@@ -62,12 +62,12 @@ abstract class DataModule {
         @Singleton
         fun provideOkHttpClient(): OkHttpClient {
             val logging = HttpLoggingInterceptor().apply {
-                level = HttpLoggingInterceptor.Level.BODY
+                level = HttpLoggingInterceptor.Level.HEADERS
             }
             return OkHttpClient.Builder()
                 .addInterceptor(logging)
                 .connectTimeout(30, TimeUnit.SECONDS)
-                .readTimeout(60, TimeUnit.SECONDS)
+                .readTimeout(120, TimeUnit.SECONDS)
                 .writeTimeout(30, TimeUnit.SECONDS)
                 .build()
         }
