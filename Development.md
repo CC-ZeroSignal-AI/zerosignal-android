@@ -183,3 +183,53 @@ Wire the Pack Store UI to the live Vercel API at `https://zerosignal-web.vercel.
 ```bash
 cd zerosignal-android && ./gradlew :app:assembleDebug
 ```
+
+---
+
+## Global Exception Handler & File Logging (Agent:Cursor)
+
+### Task Summary
+Added a global uncaught exception handler, a file-based logger, and a drop-in `ZSLog` wrapper so that all errors, warnings, and runtime logs are captured to an on-device log file. Crashes are written synchronously before the process dies.
+
+### New Files Created
+
+| File | Purpose |
+|------|---------|
+| `app/.../logging/AppFileLogger.kt` | Core file logger — writes all log entries to a rotating log file (`zerosignal.log`, max 5 MB, keeps 1 previous generation). Thread-safe via single-threaded executor. Writes device info header on session start. Crash entries are written **synchronously** to survive process death. |
+| `app/.../logging/ZSLog.kt` | Drop-in replacement for `android.util.Log`. Every call (V/D/I/W/E/WTF) writes to both Logcat **and** the on-device file via `AppFileLogger`. Supports all overloads including `Throwable` variants. |
+| `app/.../logging/CrashHandler.kt` | Global `Thread.UncaughtExceptionHandler`. Intercepts uncaught exceptions, writes the full stack trace to the log file, then forwards to the default system handler so Android can show its crash dialog. |
+
+### Files Modified
+
+| File | Changes |
+|------|---------|
+| `app/.../ZeroSignalApp.kt` | Initialises `AppFileLogger` and installs `CrashHandler` in `onCreate()`. Logs app startup. |
+| `app/.../MainActivity.kt` | Added lifecycle logging (`onCreate`, `onResume`, `onPause`, `onDestroy`) via `ZSLog`. |
+| `app/.../RagViewModel.kt` | Logs user questions, response completion, empty-question warnings, and errors with full stack traces. |
+| `app/.../ui/setup/SetupViewModel.kt` | Logs device capability check results, download start, progress, errors, and readiness. |
+| `core/ai/.../engine/NexaSdkEngine.kt` | Logs model loading, stream start, token counts, completion, and errors via `android.util.Log`. |
+| `core/ai/.../di/AiModule.kt` | Logs device capability, SDK init success/failure, and model path. Fixed `InitCallback` parameter name (`reason` instead of `error`). |
+| `core/ai/.../repository/NexaModelRepository.kt` | Logs model readiness checks, download start/skip/completion per file, content-length, verification results, and errors. |
+
+### How It Works
+
+1. **App starts** → `AppFileLogger.init()` creates/opens the log file and writes a device-info header
+2. **Crash handler installed** → `CrashHandler.install()` sets a global `UncaughtExceptionHandler`
+3. **App-layer logging** → Uses `ZSLog.d(TAG, msg)` which writes to both Logcat and the file
+4. **Core-layer logging** → Uses `android.util.Log` (goes to Logcat; crashes still caught by `CrashHandler`)
+5. **Uncaught exception** → `CrashHandler` writes the full crash trace synchronously to the file, then forwards to system handler
+6. **File rotation** → When `zerosignal.log` exceeds 5 MB, it's rotated to `zerosignal.1.log`
+
+### Log File Location
+```
+/data/data/com.zerosignal.cognitedge/files/logs/zerosignal.log
+```
+
+To pull the log file from a device:
+```bash
+adb shell run-as com.zerosignal.cognitedge cat files/logs/zerosignal.log > zerosignal.log
+```
+
+### Build Status
+- `./gradlew :app:assembleDebug` — **BUILD SUCCESSFUL**
+- APK generated: `app/build/outputs/apk/debug/app-debug.apk` (120 MB)

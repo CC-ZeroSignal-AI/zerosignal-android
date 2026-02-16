@@ -7,4 +7,5 @@ interface ModelRepository {
     fun isModelReady(): Boolean
     fun downloadModel(): Flow<ModelDownloadState>
     fun getModelPath(): String?
+    fun getGgufModelPath(): String?
 }

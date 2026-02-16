@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.zerosignal.cognitedge.domain.model.ChatMessage
 import com.zerosignal.cognitedge.domain.usecase.AskQuestionUseCase
+import com.zerosignal.cognitedge.logging.ZSLog
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -26,6 +27,10 @@ class RagViewModel @Inject constructor(
     private val askQuestionUseCase: AskQuestionUseCase
 ) : ViewModel() {
 
+    companion object {
+        private const val TAG = "RagViewModel"
+    }
+
     private val _uiState = MutableStateFlow(RagUiState())
     val uiState: StateFlow<RagUiState> = _uiState.asStateFlow()
 
@@ -36,9 +41,12 @@ class RagViewModel @Inject constructor(
         inFlightJob = viewModelScope.launch {
             try {
                 if (question.isBlank()) {
+                    ZSLog.w(TAG, "Empty question submitted")
                     _uiState.update { it.copy(errorMessage = "Question cannot be blank") }
                     return@launch
                 }
+
+                ZSLog.i(TAG, "User asked: ${question.take(80)}...")
 
                 // Add user message
                 val userMsg = ChatMessage(
@@ -57,6 +65,7 @@ class RagViewModel @Inject constructor(
                 // Single call — retrieves context + streams response
                 val askResult = askQuestionUseCase.invoke(question)
                 val sourceIds = askResult.sourcesUsed
+                ZSLog.d(TAG, "Sources used: $sourceIds")
 
                 val assistantId = UUID.randomUUID().toString()
                 val builder = StringBuilder()
@@ -106,7 +115,9 @@ class RagViewModel @Inject constructor(
                         answer = builder.toString()
                     )
                 }
+                ZSLog.i(TAG, "Response complete — ${builder.length} chars")
             } catch (t: Throwable) {
+                ZSLog.e(TAG, "Error during ask()", t)
                 _uiState.update { it.copy(isThinking = false, errorMessage = t.message ?: "Unknown error") }
             }
         }
