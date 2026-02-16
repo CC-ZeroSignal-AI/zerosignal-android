@@ -233,3 +233,155 @@ adb shell run-as com.zerosignal.cognitedge cat files/logs/zerosignal.log > zeros
 ### Build Status
 - `./gradlew :app:assembleDebug` — **BUILD SUCCESSFUL**
 - APK generated: `app/build/outputs/apk/debug/app-debug.apk` (120 MB)
+
+---
+
+## NPU → CPU/GPU Fallback & Dynamic File Discovery
+
+### Task Summary
+Added NPU→CPU/GPU automatic fallback, dynamic model file discovery from HuggingFace API, and GGUF model download support so inference works on all Snapdragon devices (not just Gen 4/Elite NPU).
+
+### Changes Made
+
+#### 1. NexaSdkEngine — NPU→CPU/GPU Fallback — DONE
+- **`core/ai/.../engine/NexaSdkEngine.kt`**
+- Tries NPU plugin first (`pluginId = "npu"`) with the `.nexa` model directory
+- On NPU failure, catches exception and falls back to CPU/GPU plugin (`pluginId = "cpu_gpu"`) with GGUF file
+- GGUF model path: `{modelDir}/model.gguf`
+- Logs which plugin loaded successfully
+
+#### 2. NexaModelRepository — Dynamic File Listing — DONE
+- **`core/ai/.../repository/NexaModelRepository.kt`**
+- Replaced hardcoded 6-file NPU list with dynamic HuggingFace API discovery
+- Uses `ModelFileListingUtil.listFilesFromHuggingFace(repoId)` to query files at runtime
+- Caches file manifest locally (`file_manifest.txt`) to avoid repeated API calls
+- Downloads both NPU files (from `NexaAI/Llama3.2-3B-NPU-Turbo-NPU-mobile`) and GGUF file (from `bartowski/Llama-3.2-3B-Instruct-GGUF`)
+- `isNpuModelReady()` reads cached manifest instead of hardcoded file list
+- `isGgufModelReady()` checks for `model.gguf` file existence
+
+#### 3. ModelFileListingUtil — NEW — DONE
+- **`core/ai/.../util/ModelFileListingUtil.kt`**
+- Queries HuggingFace API (`https://huggingface.co/api/models/{repoId}`) for file listings
+- Parses JSON response to extract filenames and sizes
+- Provides `saveManifest()` / `readManifest()` for local caching
+- Pattern: based on Nexa SDK demo app approach
+
+#### 4. AiModule — Updated Provider — DONE
+- **`core/ai/.../di/AiModule.kt`**
+- Passes `modelDir` (directory) instead of single file path to `NexaSdkEngine`
+- Engine handles NPU/GGUF file resolution internally
+
+### Files Modified
+
+| File | Changes |
+|------|---------|
+| `core/ai/.../engine/NexaSdkEngine.kt` | NPU→CPU/GPU fallback, GGUF path resolution |
+| `core/ai/.../repository/NexaModelRepository.kt` | Dynamic file listing, manifest caching, GGUF download |
+| `core/ai/.../util/ModelFileListingUtil.kt` | New — HuggingFace API querying, manifest I/O |
+| `core/ai/.../di/AiModule.kt` | Directory-based model path |
+
+### Build Status
+- `./gradlew :app:assembleDebug` — **BUILD SUCCESSFUL**
+
+---
+
+## UI/UX Redesign — "Obsidian Clarity"
+
+### Task Summary
+Complete UI overhaul from cyberpunk neon theme to refined monochrome dark design inspired by Linear/Arc/Vercel. 11 files changed across theme, chat, store, navigation, and setup screens.
+
+### Design System
+- **Base**: OLED true black (`#09090B`) with 4-tier surface hierarchy
+- **Text**: 4-level hierarchy — Primary (`#F4F4F5`), Secondary (`#A1A1AA`), Tertiary (`#71717A`), Quaternary (`#52525B`)
+- **Accent**: Restrained indigo-400 (`#818CF8`) — single accent color, no gradients
+- **Typography**: Tighter letter-spacing on headlines, refined size scale
+- **Borders**: Ghost borders at 0.5dp with subtle alpha
+
+### Changes Made
+
+| File | Changes |
+|------|---------|
+| `ui/theme/Color.kt` | Full palette replacement — Obsidian base, 4 surfaces, 4 text tiers, indigo accent, legacy aliases |
+| `ui/theme/Type.kt` | Tighter letter-spacing (-0.8sp to -1.2sp), refined sizes, removed Monospace |
+| `ui/theme/Theme.kt` | New `ObsidianColorScheme`, SideEffect for status/nav bars, removed deprecated APIs |
+| `ui/chat/ChatScreen.kt` | Clean white wordmark, HorizontalDivider, muted text hierarchy |
+| `ui/chat/components/MessageBubble.kt` | User: `Accent.copy(alpha=0.12f)`, Assistant: `Surface2`, no gradients |
+| `ui/chat/components/ChatInputBar.kt` | ArrowUpward send icon, solid white circle button, no gradient borders |
+| `ui/store/PackStoreScreen.kt` | Clean white title, outlined icons, muted tints |
+| `ui/store/components/PackCard.kt` | Ghost borders, solid white download button, outlined icons |
+| `ui/store/components/SearchBar.kt` | Clean Surface2 background, no gradient border |
+| `ui/navigation/MainScreen.kt` | AutoMirrored.Chat icon, white selected / quaternary unselected |
+| `ui/setup/SetupScreen.kt` | Rich "Briefing" onboarding — capability cards, model specs, contextual info |
+
+### Setup Screen — "The Briefing" Redesign
+- **NotStarted**: 3 capability rows (Offline, Private, NPU Accelerated) + Model spec card (Name, Provider, Size, Quantization, Runtime) + full-width white CTA + Wi-Fi note
+- **Downloading**: Large percentage display, animated progress bar, GB counter, "While you wait" info card
+- **Unsupported device**: Warning badge, explanation, Requirements card
+- **Error**: Warning badge, error message, outlined Retry button
+- Scrollable layout with extracted composable functions
+
+### Build Status
+- `./gradlew :app:assembleDebug` — **BUILD SUCCESSFUL**
+- APK: `app-debug.apk` (131 MB)
+
+---
+
+## KNOWN PROBLEM: NPU Error -100201
+
+### Symptoms
+On a real Snapdragon device (non-Gen 4/Elite), the NPU model fails to load:
+```
+02-15 23:32:10.433 E NexaSdk : [JNI] create() failed, error code: -100201
+02-15 23:32:10.452 W NexaSdkEngine: NPU model load failed (error: Llm create failed, error code: -1397595912), falling back to CPU/GPU
+```
+
+### What Works
+- CPU/GPU fallback activates correctly after NPU failure
+- GGUF model loads successfully via `cpu_gpu` plugin
+- Inference completes: **460 tokens generated in ~67 seconds**
+- Full log sequence:
+  ```
+  NexaSdkEngine: Attempting NPU model load...
+  NexaSdk: [JNI] create() failed, error code: -100201
+  NexaSdkEngine: NPU model load failed, falling back to CPU/GPU
+  NexaSdkEngine: Model loaded successfully with plugin: cpu_gpu
+  NexaSdkEngine: Stream completed — 460 tokens generated
+  ```
+
+### Root Cause (Suspected)
+- Error `-100201` is an NPU hardware incompatibility error
+- The `NexaAI/Llama3.2-3B-NPU-Turbo-NPU-mobile` model requires **Snapdragon 8 Gen 4 / Snapdragon X Elite** NPU
+- Older Snapdragon chips (Gen 1/2/3) don't have the correct NPU firmware/drivers
+- The Nexa SDK `npu` plugin silently fails when the hardware doesn't match
+
+### Impact
+- App works fine via CPU/GPU fallback (slower but functional)
+- ~3.5 GB of NPU model files are downloaded but unused on non-Gen4 devices
+- Unnecessary NPU load attempt adds ~2-3 seconds to first inference
+
+---
+
+## TODO — Next Session
+
+### Priority 1: Investigate NPU Compatibility
+- [ ] Determine exact Snapdragon chip on test device (`getprop ro.board.platform` / `Build.SOC_MODEL`)
+- [ ] Research Nexa SDK NPU error code `-100201` — is it documented? Any known workarounds?
+- [ ] Check if `NexaAI/Llama3.2-3B-NPU-Turbo-NPU-mobile` has hardware requirements in its model card
+- [ ] Look into whether there are NPU models for older Snapdragon generations (Gen 2/3)
+
+### Priority 2: Smart NPU Detection (Skip NPU on Unsupported Chips)
+- [ ] Detect Snapdragon generation at runtime before attempting NPU load
+- [ ] If chip < Gen 4: skip NPU attempt entirely, go straight to CPU/GPU
+- [ ] If chip >= Gen 4: attempt NPU first, fall back to CPU/GPU on failure
+- [ ] Save detected capability to SharedPreferences so subsequent launches skip probing
+
+### Priority 3: Optimize Download Size
+- [ ] If device is not NPU-capable, skip downloading NPU files (~3.5 GB)
+- [ ] Only download GGUF file (~2 GB) for CPU/GPU-only devices
+- [ ] Show appropriate model info on Setup screen based on detected capability
+
+### Priority 4: Performance Profiling
+- [ ] Measure CPU/GPU inference speed (tokens/sec) on test device
+- [ ] Compare with NPU inference speed (if NPU becomes available)
+- [ ] Profile memory usage during inference
+- [ ] Check battery impact of sustained CPU/GPU inference

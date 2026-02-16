@@ -1,12 +1,11 @@
 package com.zerosignal.cognitedge.ui.store.components
 
-import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Search
-import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.outlined.Close
+import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -16,13 +15,12 @@ import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
-import com.zerosignal.cognitedge.ui.theme.GradientEnd
-import com.zerosignal.cognitedge.ui.theme.GradientStart
-import com.zerosignal.cognitedge.ui.theme.NeonCyan
-import com.zerosignal.cognitedge.ui.theme.SurfaceCard
+import com.zerosignal.cognitedge.ui.theme.Accent
+import com.zerosignal.cognitedge.ui.theme.Surface2
+import com.zerosignal.cognitedge.ui.theme.TextQuaternary
+import com.zerosignal.cognitedge.ui.theme.TextTertiary
 
 @Composable
 fun PackSearchBar(
@@ -30,7 +28,7 @@ fun PackSearchBar(
     onQueryChange: (String) -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val shape = RoundedCornerShape(16.dp)
+    val shape = RoundedCornerShape(12.dp)
 
     TextField(
         value = query,
@@ -38,47 +36,41 @@ fun PackSearchBar(
         modifier = modifier
             .fillMaxWidth()
             .padding(horizontal = 16.dp, vertical = 8.dp)
-            .clip(shape)
-            .border(
-                width = 1.dp,
-                brush = Brush.linearGradient(
-                    colors = listOf(
-                        GradientStart.copy(alpha = 0.4f),
-                        GradientEnd.copy(alpha = 0.2f)
-                    )
-                ),
-                shape = shape
-            ),
+            .clip(shape),
         placeholder = {
             Text(
                 "Search packs...",
-                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f)
+                style = MaterialTheme.typography.bodyMedium,
+                color = TextQuaternary
             )
         },
         leadingIcon = {
             Icon(
-                Icons.Default.Search,
+                Icons.Outlined.Search,
                 contentDescription = "Search",
-                tint = NeonCyan.copy(alpha = 0.6f)
+                tint = TextTertiary
             )
         },
         trailingIcon = {
             if (query.isNotEmpty()) {
                 IconButton(onClick = { onQueryChange("") }) {
                     Icon(
-                        Icons.Default.Close,
+                        Icons.Outlined.Close,
                         contentDescription = "Clear",
-                        tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
+                        tint = TextTertiary
                     )
                 }
             }
         },
         colors = TextFieldDefaults.colors(
-            focusedContainerColor = SurfaceCard,
-            unfocusedContainerColor = SurfaceCard,
+            focusedContainerColor = Surface2,
+            unfocusedContainerColor = Surface2,
             focusedIndicatorColor = Color.Transparent,
             unfocusedIndicatorColor = Color.Transparent,
-            cursorColor = NeonCyan
+            cursorColor = Accent
+        ),
+        textStyle = MaterialTheme.typography.bodyMedium.copy(
+            color = MaterialTheme.colorScheme.onSurface
         ),
         shape = shape,
         singleLine = true
