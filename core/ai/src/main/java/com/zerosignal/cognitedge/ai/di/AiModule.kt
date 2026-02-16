@@ -2,6 +2,7 @@ package com.zerosignal.cognitedge.ai.di
 
 import android.content.Context
 import android.os.Build
+import android.util.Log
 import com.nexa.sdk.NexaSdk
 import com.zerosignal.cognitedge.ai.engine.NexaInferenceEngine
 import com.zerosignal.cognitedge.ai.engine.NexaSdkEngine
@@ -35,6 +36,8 @@ abstract class AiModule {
     ): ModelRepository
 
     companion object {
+        private const val TAG = "AiModule"
+
         @Provides
         @Singleton
         fun provideNexaInferenceEngine(
@@ -42,38 +45,38 @@ abstract class AiModule {
             modelRepository: ModelRepository
         ): NexaInferenceEngine {
             val deviceInfo = DeviceCapability.detect()
+            Log.i(TAG, "Device capability — emulator=${deviceInfo.isEmulator}, snapdragon=${deviceInfo.isSnapdragon}")
 
             if (deviceInfo.isEmulator || !deviceInfo.isSnapdragon) {
+                Log.e(TAG, "Unsupported device — blocking engine creation")
                 throw UnsupportedDeviceException(
                     "This app requires a Qualcomm Snapdragon device with NPU support. " +
                         "Emulators and non-Snapdragon devices are not supported."
                 )
             }
 
-            // Initialize Nexa SDK
-            // init takes (Context, InitCallback) but second arg is optional?
-            // If not optional, we pass null or empty callback
-            // Checking javap output: public final void init(Context, InitCallback)
-            // There is no init$default for the callback. So we must provide it.
-            // But InitCallback is an interface. We can pass a simple implementation.
-            
+            Log.i(TAG, "Initializing Nexa SDK")
             NexaSdk.getInstance().init(context, object : NexaSdk.InitCallback {
                 override fun onSuccess() {
-                    // Initialization successful
+                    Log.i(TAG, "Nexa SDK initialized successfully")
                 }
 
-                override fun onFailure(error: String) {
-                    // Initialization failed
-                    // Since this is just initialization, we might log it but can't really crash here
-                    // The engine will fail later if SDK isn't initialized
+                override fun onFailure(reason: String) {
+                    Log.e(TAG, "Nexa SDK initialization failed: $reason")
                 }
             })
 
-            val modelPath = modelRepository.getModelPath()
-            // Model path may be null if not yet downloaded — the engine is still
-            // provided but will fail at inference time. The SetupScreen gate
-            // enforces download before reaching the chat screen.
-            return NexaSdkEngine(modelPath ?: "", pluginId = "npu")
+            val npuModelPath = modelRepository.getModelPath()
+            val ggufModelPath = modelRepository.getGgufModelPath()
+            val nativeLibDir = context.applicationInfo.nativeLibraryDir
+            Log.i(TAG, "NPU model path: ${npuModelPath ?: "(not downloaded)"}")
+            Log.i(TAG, "GGUF model path: ${ggufModelPath ?: "(not downloaded)"}")
+            Log.i(TAG, "Native lib dir: $nativeLibDir")
+            return NexaSdkEngine(
+                npuModelPath = npuModelPath ?: "",
+                ggufModelPath = ggufModelPath ?: "",
+                nativeLibDir = nativeLibDir
+            )
         }
     }
 }

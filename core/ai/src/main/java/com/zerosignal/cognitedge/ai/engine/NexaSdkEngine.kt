@@ -1,6 +1,8 @@
 package com.zerosignal.cognitedge.ai.engine
 
+import android.util.Log
 import com.nexa.sdk.LlmWrapper
+import com.nexa.sdk.bean.ChatMessage
 import com.nexa.sdk.bean.GenerationConfig
 import com.nexa.sdk.bean.LlmCreateInput
 import com.nexa.sdk.bean.LlmStreamResult
@@ -13,65 +15,156 @@ import kotlinx.coroutines.sync.withLock
 
 /**
  * Real Nexa SDK wrapper for on-device LLM inference.
- * Uses LlmWrapper with Qualcomm NPU (or CPU/GPU fallback) plugin.
+ * Matches the official Nexa SDK demo app pattern:
+ * - Tries NPU plugin first with .nexa model files
+ * - Falls back to cpu_gpu plugin with GGUF model
+ * - Uses applyChatTemplate() before generateStreamFlow()
  */
 class NexaSdkEngine(
-    private val modelPath: String,
-    private val pluginId: String = "npu"
+    private val npuModelPath: String,
+    private val ggufModelPath: String,
+    private val nativeLibDir: String
 ) : NexaInferenceEngine {
+
+    companion object {
+        private const val TAG = "NexaSdkEngine"
+    }
 
     private val mutex = Mutex()
 
     @Volatile
     private var llmWrapper: LlmWrapper? = null
 
+    @Volatile
+    private var activePlugin: String? = null
+
     private suspend fun ensureLoaded(): LlmWrapper {
         llmWrapper?.let { return it }
         return mutex.withLock {
             llmWrapper?.let { return it }
-            
-            // Create ModelConfig with default values
-            val modelConfig = ModelConfig()
-            
-            // Create LlmCreateInput
-            // Constructor: (model_name, model_path, tokenizer_path, config, plugin_id, device_id)
-            // We use modelPath for both model_path and tokenizer_path as it's a directory
-            val input = LlmCreateInput(
-                model_name = "Llama3.2-3B-NPU-Turbo",
-                model_path = modelPath,
-                tokenizer_path = modelPath,
-                config = modelConfig,
-                plugin_id = pluginId,
-                device_id = "cpu" // Standard device ID for initialization context, actual execution uses plugin
-            )
 
-            // Build LlmWrapper using suspending builder
-            val result = LlmWrapper.builder()
-                .llmCreateInput(input)
-                .build() // This is a suspending function returning Result<LlmWrapper>
-            
-            val wrapper = result.getOrThrow()
-            llmWrapper = wrapper
-            wrapper
+            // Try NPU first if model path is available
+            if (npuModelPath.isNotEmpty()) {
+                try {
+                    val wrapper = createNpuWrapper()
+                    llmWrapper = wrapper
+                    activePlugin = "npu"
+                    Log.i(TAG, "LLM model loaded successfully via NPU")
+                    return wrapper
+                } catch (e: Exception) {
+                    Log.w(TAG, "NPU model load failed (error: ${e.message}), falling back to CPU/GPU")
+                }
+            }
+
+            // Fall back to CPU/GPU with GGUF model
+            if (ggufModelPath.isNotEmpty()) {
+                try {
+                    val wrapper = createCpuGpuWrapper()
+                    llmWrapper = wrapper
+                    activePlugin = "cpu_gpu"
+                    Log.i(TAG, "LLM model loaded successfully via CPU/GPU (GGUF)")
+                    return wrapper
+                } catch (e: Exception) {
+                    Log.e(TAG, "CPU/GPU model load also failed", e)
+                    throw RuntimeException(
+                        "Failed to load model on both NPU and CPU/GPU: ${e.message}", e
+                    )
+                }
+            }
+
+            throw RuntimeException("No model available — NPU path: '$npuModelPath', GGUF path: '$ggufModelPath'")
         }
     }
 
-    override fun streamCompletion(prompt: String): Flow<ResponseChunk> = flow {
-        val wrapper = ensureLoaded()
-        
-        // Create GenerationConfig
-        val config = GenerationConfig()
-        config.maxTokens = 1024
+    private suspend fun createNpuWrapper(): LlmWrapper {
+        Log.i(TAG, "Loading NPU model from: $npuModelPath")
 
-        wrapper.generateStreamFlow(prompt, config).collect { result ->
+        // Match Nexa demo: explicitly set npu_lib_folder_path and npu_model_folder_path
+        val modelConfig = ModelConfig(
+            nCtx = 1024,
+            npu_lib_folder_path = nativeLibDir,
+            npu_model_folder_path = npuModelPath
+        )
+
+        // model_path should be the actual .nexa file (e.g. files-1-2.nexa)
+        // The SDK uses nexa.manifest to derive the model name
+        val manifestPath = "$npuModelPath/nexa.manifest"
+        val input = LlmCreateInput(
+            model_name = "Llama3.2-3B-NPU-Turbo",
+            model_path = manifestPath,
+            tokenizer_path = npuModelPath,
+            config = modelConfig,
+            plugin_id = "npu",
+            device_id = ""
+        )
+
+        val result = LlmWrapper.builder()
+            .llmCreateInput(input)
+            .build()
+        return result.getOrThrow()
+    }
+
+    private suspend fun createCpuGpuWrapper(): LlmWrapper {
+        Log.i(TAG, "Loading GGUF model from: $ggufModelPath (plugin=cpu_gpu)")
+
+        // Match Nexa demo: nCtx=1024, nGpuLayers=0 for CPU-only
+        val modelConfig = ModelConfig(
+            nCtx = 1024,
+            nGpuLayers = 0
+        )
+
+        val input = LlmCreateInput(
+            model_name = "",
+            model_path = ggufModelPath,
+            tokenizer_path = null,
+            config = modelConfig,
+            plugin_id = "cpu_gpu"
+        )
+
+        val result = LlmWrapper.builder()
+            .llmCreateInput(input)
+            .build()
+        return result.getOrThrow()
+    }
+
+    override fun streamCompletion(prompt: String): Flow<ResponseChunk> = flow {
+        Log.d(TAG, "streamCompletion called — prompt length=${prompt.length}")
+        val wrapper = ensureLoaded()
+        Log.d(TAG, "Using plugin: $activePlugin")
+
+        // Apply chat template like the Nexa demo does
+        val chatMessages = arrayOf(
+            ChatMessage("user", prompt)
+        )
+
+        val formattedPrompt = try {
+            val templateResult = wrapper.applyChatTemplate(chatMessages, null, false)
+            templateResult.getOrNull()?.formattedText ?: prompt
+        } catch (e: Exception) {
+            Log.w(TAG, "applyChatTemplate failed, using raw prompt: ${e.message}")
+            prompt
+        }
+
+        Log.d(TAG, "Formatted prompt length=${formattedPrompt.length}")
+
+        // Match Nexa demo GenerationConfig
+        val config = GenerationConfig(
+            maxTokens = 2048
+        )
+
+        var tokenCount = 0
+        wrapper.generateStreamFlow(formattedPrompt, config).collect { result ->
             when (result) {
                 is LlmStreamResult.Token -> {
+                    tokenCount++
                     emit(ResponseChunk(token = result.text, isFinal = false))
                 }
                 is LlmStreamResult.Completed -> {
+                    Log.d(TAG, "Stream completed — $tokenCount tokens generated (plugin=$activePlugin)")
                     emit(ResponseChunk(token = "", isFinal = true))
                 }
                 is LlmStreamResult.Error -> {
+                    Log.e(TAG, "Inference error", result.throwable)
                     throw RuntimeException("Inference error: ${result.throwable.message}")
                 }
             }
@@ -79,17 +172,17 @@ class NexaSdkEngine(
     }
 
     fun unload() {
-        // We can't use mutex.withLock in a non-suspend function if unload needs to be blocking
-        // But unload is usually called from lifecycle methods which can launch a coroutine
-        // For now, we'll just check null safely
+        Log.i(TAG, "Unloading LLM model (plugin=$activePlugin)")
         val wrapper = llmWrapper
         if (wrapper != null) {
             try {
                 wrapper.close()
+                Log.i(TAG, "LLM model unloaded")
             } catch (e: Exception) {
-                // Ignore close errors
+                Log.w(TAG, "Error closing LlmWrapper", e)
             } finally {
                 llmWrapper = null
+                activePlugin = null
             }
         }
     }
