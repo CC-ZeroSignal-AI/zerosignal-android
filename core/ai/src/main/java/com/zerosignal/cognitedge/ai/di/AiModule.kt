@@ -2,8 +2,8 @@ package com.zerosignal.cognitedge.ai.di
 
 import android.content.Context
 import android.os.Build
-import android.util.Log
 import com.nexa.sdk.NexaSdk
+import com.zerosignal.cognitedge.ai.util.AiFileLog
 import com.zerosignal.cognitedge.ai.engine.NexaInferenceEngine
 import com.zerosignal.cognitedge.ai.engine.NexaSdkEngine
 import com.zerosignal.cognitedge.ai.repository.NexaInferenceRepository
@@ -44,34 +44,45 @@ abstract class AiModule {
             @ApplicationContext context: Context,
             modelRepository: ModelRepository
         ): NexaInferenceEngine {
+            AiFileLog.init(context)
+            AiFileLog.i(TAG, "--- Engine provisioning started ---")
             val deviceInfo = DeviceCapability.detect()
-            Log.i(TAG, "Device capability — emulator=${deviceInfo.isEmulator}, snapdragon=${deviceInfo.isSnapdragon}")
 
-            if (deviceInfo.isEmulator || !deviceInfo.isSnapdragon) {
-                Log.e(TAG, "Unsupported device — blocking engine creation")
+            if (deviceInfo.isEmulator) {
+                AiFileLog.e(TAG, "BLOCKED: Device is an emulator — engine creation denied")
+                throw UnsupportedDeviceException(
+                    "This app requires a Qualcomm Snapdragon device with NPU support. " +
+                        "Emulators and non-Snapdragon devices are not supported."
+                )
+            }
+            if (!deviceInfo.isSnapdragon) {
+                AiFileLog.e(TAG, "BLOCKED: Device is not Snapdragon — engine creation denied")
                 throw UnsupportedDeviceException(
                     "This app requires a Qualcomm Snapdragon device with NPU support. " +
                         "Emulators and non-Snapdragon devices are not supported."
                 )
             }
 
-            Log.i(TAG, "Initializing Nexa SDK")
+            AiFileLog.i(TAG, "Device is supported (Snapdragon, non-emulator) — proceeding with SDK init")
+            AiFileLog.i(TAG, "Initializing Nexa SDK...")
             NexaSdk.getInstance().init(context, object : NexaSdk.InitCallback {
                 override fun onSuccess() {
-                    Log.i(TAG, "Nexa SDK initialized successfully")
+                    AiFileLog.i(TAG, "Nexa SDK initialized successfully")
                 }
 
                 override fun onFailure(reason: String) {
-                    Log.e(TAG, "Nexa SDK initialization failed: $reason")
+                    AiFileLog.e(TAG, "Nexa SDK initialization failed: $reason")
                 }
             })
 
             val npuModelPath = modelRepository.getModelPath()
             val ggufModelPath = modelRepository.getGgufModelPath()
             val nativeLibDir = context.applicationInfo.nativeLibraryDir
-            Log.i(TAG, "NPU model path: ${npuModelPath ?: "(not downloaded)"}")
-            Log.i(TAG, "GGUF model path: ${ggufModelPath ?: "(not downloaded)"}")
-            Log.i(TAG, "Native lib dir: $nativeLibDir")
+            AiFileLog.i(TAG, "Model paths resolved:")
+            AiFileLog.i(TAG, "  NPU model:  ${npuModelPath ?: "(not downloaded)"}")
+            AiFileLog.i(TAG, "  GGUF model: ${ggufModelPath ?: "(not downloaded)"}")
+            AiFileLog.i(TAG, "  Native lib: $nativeLibDir")
+            AiFileLog.i(TAG, "--- Engine provisioning complete — handing off to NexaSdkEngine ---")
             return NexaSdkEngine(
                 npuModelPath = npuModelPath ?: "",
                 ggufModelPath = ggufModelPath ?: "",
@@ -86,18 +97,40 @@ data class DeviceCapability(
     val isSnapdragon: Boolean
 ) {
     companion object {
+        private const val TAG = "DeviceCapability"
+
         fun detect(): DeviceCapability {
-            val isEmulator = Build.FINGERPRINT.contains("generic", ignoreCase = true)
-                || Build.MODEL.contains("Emulator", ignoreCase = true)
-                || Build.MODEL.contains("Android SDK", ignoreCase = true)
-                || Build.BRAND.startsWith("generic")
-                || Build.DEVICE.startsWith("generic")
+            AiFileLog.i(TAG, "--- Device detection started ---")
+            AiFileLog.i(TAG, "Build.FINGERPRINT = ${Build.FINGERPRINT}")
+            AiFileLog.i(TAG, "Build.MODEL       = ${Build.MODEL}")
+            AiFileLog.i(TAG, "Build.BRAND       = ${Build.BRAND}")
+            AiFileLog.i(TAG, "Build.DEVICE      = ${Build.DEVICE}")
+            AiFileLog.i(TAG, "Build.HARDWARE    = ${Build.HARDWARE}")
+            AiFileLog.i(TAG, "Build.BOARD       = ${Build.BOARD}")
+            AiFileLog.i(TAG, "Build.PRODUCT     = ${Build.PRODUCT}")
+            AiFileLog.i(TAG, "Build.MANUFACTURER= ${Build.MANUFACTURER}")
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                AiFileLog.i(TAG, "Build.SOC_MODEL   = ${Build.SOC_MODEL}")
+                AiFileLog.i(TAG, "Build.SOC_MANUFACTURER = ${Build.SOC_MANUFACTURER}")
+            }
+            AiFileLog.i(TAG, "Build.VERSION.SDK_INT = ${Build.VERSION.SDK_INT}")
 
-            val isSnapdragon = Build.HARDWARE.contains("qcom", ignoreCase = true)
-                || Build.BOARD.contains("sm", ignoreCase = true)
-                || (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S
-                    && Build.SOC_MODEL.contains("Snapdragon", ignoreCase = true))
+            val fingerprintGeneric = Build.FINGERPRINT.contains("generic", ignoreCase = true)
+            val modelEmulator = Build.MODEL.contains("Emulator", ignoreCase = true)
+            val modelSdk = Build.MODEL.contains("Android SDK", ignoreCase = true)
+            val brandGeneric = Build.BRAND.startsWith("generic")
+            val deviceGeneric = Build.DEVICE.startsWith("generic")
+            val isEmulator = fingerprintGeneric || modelEmulator || modelSdk || brandGeneric || deviceGeneric
+            AiFileLog.i(TAG, "Emulator checks — fingerprint=$fingerprintGeneric, model_emu=$modelEmulator, model_sdk=$modelSdk, brand=$brandGeneric, device=$deviceGeneric → isEmulator=$isEmulator")
 
+            val hwQcom = Build.HARDWARE.contains("qcom", ignoreCase = true)
+            val boardSm = Build.BOARD.contains("sm", ignoreCase = true)
+            val socSnapdragon = Build.VERSION.SDK_INT >= Build.VERSION_CODES.S
+                && Build.SOC_MODEL.contains("Snapdragon", ignoreCase = true)
+            val isSnapdragon = hwQcom || boardSm || socSnapdragon
+            AiFileLog.i(TAG, "Snapdragon checks — hw_qcom=$hwQcom, board_sm=$boardSm, soc_snapdragon=$socSnapdragon → isSnapdragon=$isSnapdragon")
+
+            AiFileLog.i(TAG, "--- Device detection result: isEmulator=$isEmulator, isSnapdragon=$isSnapdragon ---")
             return DeviceCapability(isEmulator, isSnapdragon)
         }
     }
