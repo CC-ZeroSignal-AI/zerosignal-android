@@ -1,7 +1,7 @@
 package com.zerosignal.cognitedge.ai.engine
 
-import android.util.Log
 import com.nexa.sdk.LlmWrapper
+import com.zerosignal.cognitedge.ai.util.AiFileLog
 import com.nexa.sdk.bean.ChatMessage
 import com.nexa.sdk.bean.GenerationConfig
 import com.nexa.sdk.bean.LlmCreateInput
@@ -39,45 +39,65 @@ class NexaSdkEngine(
     private var activePlugin: String? = null
 
     private suspend fun ensureLoaded(): LlmWrapper {
-        llmWrapper?.let { return it }
+        llmWrapper?.let {
+            AiFileLog.d(TAG, "Model already loaded (plugin=$activePlugin), reusing")
+            return it
+        }
         return mutex.withLock {
-            llmWrapper?.let { return it }
+            llmWrapper?.let {
+                AiFileLog.d(TAG, "Model already loaded after lock (plugin=$activePlugin), reusing")
+                return it
+            }
+
+            AiFileLog.i(TAG, "--- Model loading started ---")
+            AiFileLog.i(TAG, "NPU model path:  '${npuModelPath.ifEmpty { "(empty)" }}'")
+            AiFileLog.i(TAG, "GGUF model path: '${ggufModelPath.ifEmpty { "(empty)" }}'")
+            AiFileLog.i(TAG, "Native lib dir:  '$nativeLibDir'")
 
             // Try NPU first if model path is available
             if (npuModelPath.isNotEmpty()) {
+                AiFileLog.i(TAG, "Step 1: Attempting NPU load...")
                 try {
                     val wrapper = createNpuWrapper()
                     llmWrapper = wrapper
                     activePlugin = "npu"
-                    Log.i(TAG, "LLM model loaded successfully via NPU")
+                    AiFileLog.i(TAG, "NPU load SUCCESS — model active via NPU plugin")
                     return wrapper
                 } catch (e: Exception) {
-                    Log.w(TAG, "NPU model load failed (error: ${e.message}), falling back to CPU/GPU")
+                    AiFileLog.w(TAG, "NPU load FAILED: ${e.message}")
+                    AiFileLog.w(TAG, "NPU exception class: ${e.javaClass.simpleName}")
+                    AiFileLog.i(TAG, "Falling back to CPU/GPU...")
                 }
+            } else {
+                AiFileLog.i(TAG, "Step 1: NPU skipped — no model path provided")
             }
 
             // Fall back to CPU/GPU with GGUF model
             if (ggufModelPath.isNotEmpty()) {
+                AiFileLog.i(TAG, "Step 2: Attempting CPU/GPU load with GGUF...")
                 try {
                     val wrapper = createCpuGpuWrapper()
                     llmWrapper = wrapper
                     activePlugin = "cpu_gpu"
-                    Log.i(TAG, "LLM model loaded successfully via CPU/GPU (GGUF)")
+                    AiFileLog.i(TAG, "CPU/GPU load SUCCESS — model active via cpu_gpu plugin")
                     return wrapper
                 } catch (e: Exception) {
-                    Log.e(TAG, "CPU/GPU model load also failed", e)
+                    AiFileLog.e(TAG, "CPU/GPU load FAILED: ${e.message}", e)
                     throw RuntimeException(
                         "Failed to load model on both NPU and CPU/GPU: ${e.message}", e
                     )
                 }
+            } else {
+                AiFileLog.e(TAG, "Step 2: CPU/GPU skipped — no GGUF model path provided")
             }
 
+            AiFileLog.e(TAG, "--- Model loading FAILED — no usable model found ---")
             throw RuntimeException("No model available — NPU path: '$npuModelPath', GGUF path: '$ggufModelPath'")
         }
     }
 
     private suspend fun createNpuWrapper(): LlmWrapper {
-        Log.i(TAG, "Loading NPU model from: $npuModelPath")
+        AiFileLog.i(TAG, "Loading NPU model from: $npuModelPath")
 
         // Match Nexa demo: explicitly set npu_lib_folder_path and npu_model_folder_path
         val modelConfig = ModelConfig(
@@ -105,7 +125,7 @@ class NexaSdkEngine(
     }
 
     private suspend fun createCpuGpuWrapper(): LlmWrapper {
-        Log.i(TAG, "Loading GGUF model from: $ggufModelPath (plugin=cpu_gpu)")
+        AiFileLog.i(TAG, "Loading GGUF model from: $ggufModelPath (plugin=cpu_gpu)")
 
         // Match Nexa demo: nCtx=1024, nGpuLayers=0 for CPU-only
         val modelConfig = ModelConfig(
@@ -128,9 +148,9 @@ class NexaSdkEngine(
     }
 
     override fun streamCompletion(prompt: String): Flow<ResponseChunk> = flow {
-        Log.d(TAG, "streamCompletion called — prompt length=${prompt.length}")
+        AiFileLog.d(TAG, "streamCompletion called — prompt length=${prompt.length}")
         val wrapper = ensureLoaded()
-        Log.d(TAG, "Using plugin: $activePlugin")
+        AiFileLog.d(TAG, "Using plugin: $activePlugin")
 
         // Apply chat template like the Nexa demo does
         val chatMessages = arrayOf(
@@ -141,11 +161,11 @@ class NexaSdkEngine(
             val templateResult = wrapper.applyChatTemplate(chatMessages, null, false)
             templateResult.getOrNull()?.formattedText ?: prompt
         } catch (e: Exception) {
-            Log.w(TAG, "applyChatTemplate failed, using raw prompt: ${e.message}")
+            AiFileLog.w(TAG, "applyChatTemplate failed, using raw prompt: ${e.message}")
             prompt
         }
 
-        Log.d(TAG, "Formatted prompt length=${formattedPrompt.length}")
+        AiFileLog.d(TAG, "Formatted prompt length=${formattedPrompt.length}")
 
         // Match Nexa demo GenerationConfig
         val config = GenerationConfig(
@@ -160,11 +180,11 @@ class NexaSdkEngine(
                     emit(ResponseChunk(token = result.text, isFinal = false))
                 }
                 is LlmStreamResult.Completed -> {
-                    Log.d(TAG, "Stream completed — $tokenCount tokens generated (plugin=$activePlugin)")
+                    AiFileLog.d(TAG, "Stream completed — $tokenCount tokens generated (plugin=$activePlugin)")
                     emit(ResponseChunk(token = "", isFinal = true))
                 }
                 is LlmStreamResult.Error -> {
-                    Log.e(TAG, "Inference error", result.throwable)
+                    AiFileLog.e(TAG, "Inference error", result.throwable)
                     throw RuntimeException("Inference error: ${result.throwable.message}")
                 }
             }
@@ -172,14 +192,14 @@ class NexaSdkEngine(
     }
 
     fun unload() {
-        Log.i(TAG, "Unloading LLM model (plugin=$activePlugin)")
+        AiFileLog.i(TAG, "Unloading LLM model (plugin=$activePlugin)")
         val wrapper = llmWrapper
         if (wrapper != null) {
             try {
                 wrapper.close()
-                Log.i(TAG, "LLM model unloaded")
+                AiFileLog.i(TAG, "LLM model unloaded")
             } catch (e: Exception) {
-                Log.w(TAG, "Error closing LlmWrapper", e)
+                AiFileLog.w(TAG, "Error closing LlmWrapper", e)
             } finally {
                 llmWrapper = null
                 activePlugin = null
